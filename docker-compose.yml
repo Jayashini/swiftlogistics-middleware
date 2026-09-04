@@ -1,0 +1,121 @@
+services:
+
+  postgres:
+
+    image: postgres:swiftdb
+
+    environment:
+
+      POSTGRES_DB: swiftlogistics
+
+      POSTGRES_USER: postgres
+
+      POSTGRES_PASSWORD: postgres
+
+    ports:
+
+      - "5432:5432"
+
+    volumes:
+
+      - postgres_data:/var/lib/postgresql/data
+
+  rabbitmq:
+
+    image: rabbitmq:rabbitmq
+
+    ports:
+
+      - "5672:5672"
+
+      - "15672:15672"
+
+  orchestrator:
+
+    build:
+
+      context: ./orchestrator
+
+    ports:
+
+      - "8000:8000"
+
+    environment:
+
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/swiftlogistics
+
+      RABBITMQ_HOST: rabbitmq
+
+    depends_on:
+
+      - postgres
+
+      - rabbitmq
+
+  consumer:
+
+    build:
+
+      context: ./consumers
+
+    environment:
+
+      RABBITMQ_HOST: rabbitmq
+
+    depends_on:
+
+      - rabbitmq
+
+      - mock-cms
+
+      - mock-ros
+
+      - mock-wms
+
+  mock-cms:
+
+    build:
+
+      context: ./mock-cms
+
+    ports:
+
+      - "8001:8001"
+
+  mock-ros:
+
+    build:
+
+      context: ./mock-ros
+
+    ports:
+
+      - "8002:8002"
+
+  mock-wms:
+
+    build:
+
+      context: ./mock-wms
+
+    ports:
+
+      - "9000:9000"
+
+  frontend:
+
+    build:
+
+      context: ./frontend
+
+    ports:
+
+      - "5173:5173"
+
+    depends_on:
+
+      - orchestrator
+
+volumes:
+
+  postgres_data:
