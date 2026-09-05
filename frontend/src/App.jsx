@@ -8,16 +8,16 @@ function App() {
 
     return (
         <div>
-            <header className="header">
-                <h1 className="header-title">
-                    <span>⚡</span> SwiftTrack Portal
+            <header className="app-header">
+                <h1 className="app-title">
+                    SwiftTrack Logistics Dispatch
                 </h1>
-                <p className="header-subtitle">
-                    Heterogeneous Logistics Orchestration Middleware (CMS SOAP/XML | ROS REST/JSON | WMS TCP/IP)
+                <p className="app-subtitle">
+                    Create on-demand courier orders or check real-time package delivery milestones across the active grid.
                 </p>
             </header>
 
-            <main className="grid-container">
+            <main className="app-grid">
                 <OrderForm
                     setOrderId={setOrderId}
                     setCurrentOrder={setCurrentOrder}
@@ -26,6 +26,7 @@ function App() {
                 <OrderStatus
                     orderId={orderId}
                     currentOrder={currentOrder}
+                    setOrderId={setOrderId}
                     setCurrentOrder={setCurrentOrder}
                 />
             </main>

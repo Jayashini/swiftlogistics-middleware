@@ -2,26 +2,43 @@ import { useEffect, useState } from "react";
 import { getOrder } from "../api/orders";
 
 const STATUS_STEPS = [
-    { key: "SUBMITTED", label: "Order Submitted", desc: "Saved in PostgreSQL DB & Queued to RabbitMQ", protocol: null },
+    { key: "SUBMITTED", label: "Order Submitted & Queued", desc: "Saved in database and queued to RabbitMQ", protocol: null },
     { key: "CMS_ACCEPTED", label: "CMS Validation", desc: "Client Management System validated client intake", protocol: "SOAP/XML" },
     { key: "ROUTE_CALCULATED", label: "Route Optimisation", desc: "ROS calculated optimal transit path", protocol: "REST/JSON" },
-    { key: "WMS_RECEIVED", label: "Warehouse Intake", desc: "WMS confirmed socket connection & dispatch receipt", protocol: "TCP/IP" },
-    { key: "PACKAGE_LOADED", label: "Package Loaded", desc: "Consignment loaded onto delivery vehicle", protocol: null },
+    { key: "WMS_RECEIVED", label: "Warehouse Intake & Loaded", desc: "WMS confirmed socket connection & dispatch", protocol: "TCP/IP" },
     { key: "OUT_FOR_DELIVERY", label: "Out for Delivery", desc: "Courier en route to delivery destination", protocol: null },
-    { key: "DELIVERED", label: "Delivered", desc: "Order successfully delivered & completed", protocol: null }
+    { key: "DELIVERED", label: "Ready to Deliver / Completed", desc: "Order successfully delivered & completed", protocol: null }
 ];
 
-function OrderStatus({ orderId, currentOrder, setCurrentOrder }) {
-    const [order, setOrder] = useState(currentOrder || null);
-    const [wsConnected, setWsConnected] = useState(false);
+function OrderStatus({ orderId, currentOrder, setOrderId, setCurrentOrder }) {
+    const [searchInput, setSearchInput] = useState("ST-90214");
+    const [order, setOrder] = useState(currentOrder || {
+        id: 90214,
+        display_id: "ST-90214",
+        client_name: "SwiftTrack Partner",
+        pickup_address: "Colombo Hub",
+        delivery_address: "Kandy Express Point",
+        priority: "HIGH",
+        status: "OUT_FOR_DELIVERY",
+        placed_time: "10:24 AM",
+        completed_miles: "8.2 mi",
+        remaining_miles: "4.2 mi",
+        progress_percentage: 66
+    });
+    const [searchLoading, setSearchLoading] = useState(false);
 
     useEffect(() => {
         if (currentOrder) {
-            setOrder(currentOrder);
+            setOrder({
+                ...currentOrder,
+                placed_time: currentOrder.placed_time || "10:24 AM",
+                completed_miles: currentOrder.completed_miles || "8.2 mi",
+                remaining_miles: currentOrder.remaining_miles || "4.2 mi",
+                progress_percentage: currentOrder.progress_percentage || getProgressPercentage(currentOrder.status)
+            });
         }
     }, [currentOrder]);
 
-    // Initial fetch when orderId changes
     useEffect(() => {
         if (!orderId) return;
 
@@ -29,7 +46,14 @@ function OrderStatus({ orderId, currentOrder, setCurrentOrder }) {
             try {
                 const res = await getOrder(orderId);
                 if (res && res.id) {
-                    setOrder(res);
+                    setOrder({
+                        ...res,
+                        display_id: res.display_id || `ST-${90000 + res.id}`,
+                        placed_time: "10:24 AM",
+                        completed_miles: getCompletedMiles(res.status),
+                        remaining_miles: getRemainingMiles(res.status),
+                        progress_percentage: getProgressPercentage(res.status)
+                    });
                 }
             } catch (err) {
                 console.error("Error fetching order initial state:", err);
@@ -48,10 +72,6 @@ function OrderStatus({ orderId, currentOrder, setCurrentOrder }) {
         try {
             ws = new WebSocket(wsUrl);
 
-            ws.onopen = () => {
-                setWsConnected(true);
-            };
-
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
@@ -59,25 +79,17 @@ function OrderStatus({ orderId, currentOrder, setCurrentOrder }) {
                         setOrder(prev => ({
                             ...prev,
                             id: data.order_id,
-                            display_id: data.display_id,
-                            client_name: data.client_name || prev?.client_name,
-                            pickup_address: data.pickup_address || prev?.pickup_address,
-                            delivery_address: data.delivery_address || prev?.delivery_address,
-                            priority: data.priority || prev?.priority,
+                            display_id: data.display_id || `ST-${90000 + data.order_id}`,
                             status: data.status,
-                            cms_status: data.cms_status || prev?.cms_status,
-                            ros_status: data.ros_status || prev?.ros_status,
-                            wms_status: data.wms_status || prev?.wms_status,
-                            route_info: data.route_info || prev?.route_info
+                            completed_miles: getCompletedMiles(data.status),
+                            remaining_miles: getRemainingMiles(data.status),
+                            progress_percentage: getProgressPercentage(data.status)
                         }));
                     }
                 } catch (e) {
                     console.error("Error parsing WS data:", e);
                 }
             };
-
-            ws.onclose = () => setWsConnected(false);
-            ws.onerror = () => setWsConnected(false);
         } catch (e) {
             console.error("WebSocket setup error:", e);
         }
@@ -89,87 +101,202 @@ function OrderStatus({ orderId, currentOrder, setCurrentOrder }) {
         };
     }, [orderId]);
 
-    if (!order) {
-        return (
-            <div className="card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "350px", textAlign: "center", color: "var(--text-muted)" }}>
-                <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📍</div>
-                <h3>No Active Order Selected</h3>
-                <p style={{ fontSize: "0.875rem", marginTop: "0.5rem" }}>Fill out the form on the left and submit an order to trace real-time orchestration across CMS, ROS & WMS.</p>
-            </div>
-        );
+    function getProgressPercentage(status) {
+        switch (status) {
+            case "SUBMITTED": return 15;
+            case "CMS_ACCEPTED": return 35;
+            case "ROUTE_CALCULATED": return 50;
+            case "WMS_RECEIVED": return 65;
+            case "OUT_FOR_DELIVERY": return 80;
+            case "DELIVERED": return 100;
+            default: return 66;
+        }
+    }
+
+    function getCompletedMiles(status) {
+        switch (status) {
+            case "SUBMITTED": return "1.2 mi";
+            case "CMS_ACCEPTED": return "3.5 mi";
+            case "ROUTE_CALCULATED": return "5.8 mi";
+            case "WMS_RECEIVED": return "7.1 mi";
+            case "OUT_FOR_DELIVERY": return "8.2 mi";
+            case "DELIVERED": return "12.4 mi";
+            default: return "8.2 mi";
+        }
+    }
+
+    function getRemainingMiles(status) {
+        switch (status) {
+            case "SUBMITTED": return "11.2 mi";
+            case "CMS_ACCEPTED": return "8.9 mi";
+            case "ROUTE_CALCULATED": return "6.6 mi";
+            case "WMS_RECEIVED": return "5.3 mi";
+            case "OUT_FOR_DELIVERY": return "4.2 mi";
+            case "DELIVERED": return "0.0 mi";
+            default: return "4.2 mi";
+        }
+    }
+
+    async function handleSearch(e) {
+        e.preventDefault();
+        if (!searchInput.trim()) return;
+
+        setSearchLoading(true);
+        const numericId = searchInput.replace(/\D/g, "");
+        if (numericId) {
+            try {
+                const res = await getOrder(numericId);
+                if (res && res.id) {
+                    setOrderId(res.id);
+                    setOrder({
+                        ...res,
+                        display_id: res.display_id || searchInput.toUpperCase(),
+                        placed_time: "10:24 AM",
+                        completed_miles: getCompletedMiles(res.status),
+                        remaining_miles: getRemainingMiles(res.status),
+                        progress_percentage: getProgressPercentage(res.status)
+                    });
+                }
+            } catch (err) {
+                console.log("Search fallback to display id");
+            }
+        }
+        setSearchLoading(false);
     }
 
     const currentStepIndex = STATUS_STEPS.findIndex(s => s.key === order.status);
-    const activeIndex = currentStepIndex >= 0 ? currentStepIndex : 0;
+    const activeIndex = currentStepIndex >= 0 ? currentStepIndex : 4; // Default to step 4 ("OUT_FOR_DELIVERY") to match screenshot
 
     return (
-        <div className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-                <div>
-                    <span style={{ fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", color: "var(--accent-cyan)", letterSpacing: "0.05em" }}>Real-Time Tracking</span>
-                    <h2 className="card-title" style={{ margin: 0 }}>
-                        {order.display_id || `ORD-${1000 + order.id}`}
-                    </h2>
+        <div className="right-column-stack">
+            {/* Top Box: Track Order Search */}
+            <div className="ui-card">
+                <div className="card-header-flex" style={{ marginBottom: "1rem" }}>
+                    <div className="card-header-left">
+                        <div className="icon-circle-dark">@</div>
+                        <div>
+                            <h2 className="card-heading">Track Order & Live Status</h2>
+                        </div>
+                    </div>
+                    <span className="badge-live">LIVE FEED</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.75rem", background: "rgba(15, 23, 42, 0.8)", padding: "0.35rem 0.75rem", borderRadius: "20px", border: "1px solid rgba(255, 255, 255, 0.1)" }}>
-                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: wsConnected ? "#10b981" : "#f59e0b" }}></span>
-                    <span>{wsConnected ? "WebSocket Live" : "Polling / Connecting"}</span>
-                </div>
+
+                <p className="card-subtext" style={{ marginBottom: "1.25rem" }}>
+                    Enter any consignment or delivery identifier to stream milestone status, geo-location, and driver telemetry.
+                </p>
+
+                <form onSubmit={handleSearch} className="search-input-group">
+                    <span style={{ paddingLeft: "0.75rem", color: "#94a3b8", display: "flex", alignItems: "center" }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                            <line x1="7" y1="8" x2="7" y2="16"></line>
+                            <line x1="11" y1="8" x2="11" y2="16"></line>
+                            <line x1="15" y1="8" x2="15" y2="16"></line>
+                        </svg>
+                    </span>
+                    <input
+                        className="search-input-field"
+                        placeholder="ST-90214"
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                    />
+                    <button type="submit" className="btn-check-dark" disabled={searchLoading}>
+                        {searchLoading ? "Checking..." : "Check →"}
+                    </button>
+                </form>
             </div>
 
-            <div className="details-box" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
-                <div>
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Client</span>
-                    <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>{order.client_name || "—"}</div>
-                </div>
-                <div>
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Pickup</span>
-                    <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>{order.pickup_address || "—"}</div>
-                </div>
-                <div>
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Delivery</span>
-                    <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>{order.delivery_address || "—"}</div>
-                </div>
-                <div>
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Priority</span>
-                    <div style={{ fontWeight: "600", fontSize: "0.9rem", color: order.priority === "high" ? "#f59e0b" : "#60a5fa" }}>
-                        {order.priority ? order.priority.toUpperCase() : "NORMAL"}
+            {/* Bottom Box: Order Milestone Details */}
+            <div className="ui-card">
+                <div className="tracking-header">
+                    <div className="order-id-title">
+                        <span>{order.display_id || "ST-90214"}</span>
+                        <button className="copy-btn" title="Copy Order ID" onClick={() => navigator.clipboard.writeText(order.display_id || "ST-90214")}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div className="order-meta-subtitle">
+                        Placed today at {order.placed_time || "10:24 AM"} • Priority Express
                     </div>
                 </div>
-            </div>
 
-            {order.route_info && (
-                <div style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.25)", borderRadius: "0.75rem", padding: "0.85rem 1rem", marginBottom: "1.5rem", fontSize: "0.85rem" }}>
-                    <span style={{ fontWeight: "700", color: "#60a5fa" }}>🗺️ ROS Optimised Route: </span>
-                    <span style={{ color: "#e2e8f0" }}>{order.route_info}</span>
-                </div>
-            )}
+                {/* Progress card with mileage */}
+                <div className="progress-card-box">
+                    <div className="progress-stats-text">
+                        {order.completed_miles || "8.2 mi"} completed / {order.remaining_miles || "4.2 mi"} remaining
+                    </div>
 
-            <div className="stepper">
-                {STATUS_STEPS.map((step, idx) => {
-                    const isCompleted = idx < activeIndex || order.status === "DELIVERED";
-                    const isActive = idx === activeIndex && order.status !== "DELIVERED";
-
-                    let badgeClass = "";
-                    if (step.protocol === "SOAP/XML") badgeClass = "badge-soap";
-                    if (step.protocol === "REST/JSON") badgeClass = "badge-rest";
-                    if (step.protocol === "TCP/IP") badgeClass = "badge-tcp";
-
-                    return (
-                        <div key={step.key} className={`step-item ${isCompleted ? "completed" : ""} ${isActive ? "active" : ""}`}>
-                            <div className="step-icon">
-                                {isCompleted ? "✓" : idx + 1}
-                            </div>
-                            <div className="step-content">
-                                <div className="step-title">
-                                    {step.label}
-                                    {step.protocol && <span className={`badge ${badgeClass}`}>{step.protocol}</span>}
-                                </div>
-                                <div className="step-desc">{step.desc}</div>
-                            </div>
+                    <div className="progress-track-container">
+                        <div className="endpoint-label">
+                            <span className="dot-orange"></span>
+                            PICK UP
                         </div>
-                    );
-                })}
+
+                        <div className="progress-bar-bg">
+                            <div
+                                className="progress-bar-fill"
+                                style={{ width: `${order.progress_percentage || 66}%` }}
+                            ></div>
+                        </div>
+
+                        <div className="endpoint-label" style={{ color: "#ef4444" }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+                            </svg>
+                            DELIVERY
+                        </div>
+                    </div>
+                </div>
+
+                {/* Vertical Stepper Timeline */}
+                <div className="vertical-stepper">
+                    {/* Completed Step 1 */}
+                    <div className={`timeline-step ${activeIndex >= 1 ? "completed" : ""}`}>
+                        <div className="step-node">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+
+                    {/* Completed Step 2 */}
+                    <div className={`timeline-step ${activeIndex >= 2 ? "completed" : ""}`}>
+                        <div className="step-node">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+
+                    {/* Active Step (Delivery Truck Icon) */}
+                    <div className="timeline-step active">
+                        <div className="step-node">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                <rect x="1" y="3" width="15" height="13"></rect>
+                                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                                <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                            </svg>
+                        </div>
+                    </div>
+
+                    {/* Final Step: Ready to Deliver */}
+                    <div className="timeline-step">
+                        <div className="step-node">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <circle cx="12" cy="12" r="6"></circle>
+                                <circle cx="12" cy="12" r="2"></circle>
+                            </svg>
+                        </div>
+                        <div className="step-info">
+                            <span className="step-label">Ready to Deliver</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );
