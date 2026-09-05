@@ -45,7 +45,7 @@ function OrderForm({ setOrderId, setCurrentOrder }) {
                 if (setCurrentOrder) {
                     setCurrentOrder({
                         id: result.order_id,
-                        display_id: result.display_id || `ST-${90000 + result.order_id}`,
+                        display_id: result.display_id || `ORD-${1000 + result.order_id}`,
                         client_name: form.client_name,
                         pickup_address: form.pickup_address,
                         delivery_address: form.delivery_address,
@@ -54,7 +54,7 @@ function OrderForm({ setOrderId, setCurrentOrder }) {
                         cms_status: "PENDING",
                         ros_status: "PENDING",
                         wms_status: "PENDING",
-                        created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        created_at: new Date().toISOString()
                     });
                 }
             } else {

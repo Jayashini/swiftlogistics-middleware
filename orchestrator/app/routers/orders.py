@@ -118,18 +118,64 @@ async def update_order_status(
     return {"message": "Status updated", "status": order.status}
 
 
+@router.get("/")
+def list_orders(
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    orders = db.query(Order).order_by(Order.id.desc()).limit(limit).all()
+    return [
+        {
+            "id": order.id,
+            "display_id": f"ORD-{1000 + order.id}",
+            "client_name": order.client_name,
+            "pickup_address": order.pickup_address,
+            "delivery_address": order.delivery_address,
+            "priority": order.priority,
+            "status": order.status,
+            "cms_status": order.cms_status,
+            "wms_status": order.wms_status,
+            "ros_status": order.ros_status,
+            "route_info": order.route_info,
+            "created_at": order.created_at.isoformat() if order.created_at else None
+        }
+        for order in orders
+    ]
+
+
+@router.get("/latest")
+def get_latest_order(
+    db: Session = Depends(get_db)
+):
+    order = db.query(Order).order_by(Order.id.desc()).first()
+    if not order:
+        return {"error": "No orders found"}
+    return {
+        "id": order.id,
+        "display_id": f"ORD-{1000 + order.id}",
+        "client_name": order.client_name,
+        "pickup_address": order.pickup_address,
+        "delivery_address": order.delivery_address,
+        "priority": order.priority,
+        "status": order.status,
+        "cms_status": order.cms_status,
+        "wms_status": order.wms_status,
+        "ros_status": order.ros_status,
+        "route_info": order.route_info,
+        "created_at": order.created_at.isoformat() if order.created_at else None
+    }
+
+
 @router.get("/{order_id}")
 def get_order(
     order_id: int,
     db: Session = Depends(get_db)
 ):
-
-    order = db.query(Order).filter(
-        Order.id == order_id
-    ).first()
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order and order_id > 1000:
+        order = db.query(Order).filter(Order.id == order_id - 1000).first()
 
     if not order:
-
         return {
             "error": "Order not found"
         }
@@ -145,5 +191,6 @@ def get_order(
         "cms_status": order.cms_status,
         "wms_status": order.wms_status,
         "ros_status": order.ros_status,
-        "route_info": order.route_info
-    }
+        "route_info": order.route_info,
+        "created_at": order.created_at.isoformat() if order.created_at else None
+    }
