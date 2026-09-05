@@ -61,4 +61,22 @@ export async function getRecentOrders(limit = 10) {
         throw new Error(`Server returned ${response.status}`);
     }
     return response.json();
-}
+}
+
+export async function updateOrderStatus(orderId, payload) {
+    const response = await fetch(
+        `${API_URL}/orders/${orderId}/status`,
+        {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        }
+    );
+    if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+    }
+    return response.json();
+}
+
