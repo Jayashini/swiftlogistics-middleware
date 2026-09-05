@@ -42,6 +42,12 @@ def home():
     }
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+
 @app.websocket("/ws/orders")
 async def websocket_endpoint(
     websocket: WebSocket
