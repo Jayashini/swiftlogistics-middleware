@@ -1,0 +1,30 @@
+# Environment configuration (secrets & local settings)
+.env
+.env.local
+.env.*.local
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+*.pyc
+
+# Node & Frontend build artifacts
+node_modules/
+dist/
+build/
+.npm
+*.log
+npm-debug.log*
+
+# System & IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
