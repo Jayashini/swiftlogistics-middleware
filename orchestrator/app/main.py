@@ -12,9 +12,18 @@ from .websocket_manager import manager
 
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy import text
+
 Base.metadata.create_all(
     bind=engine
 )
+
+with engine.connect() as conn:
+    conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS route_info VARCHAR;"))
+    conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();"))
+    conn.commit()
+
+
 
 app = FastAPI(
     title="SwiftLogistics Middleware API"
