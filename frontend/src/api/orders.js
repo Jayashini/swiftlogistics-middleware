@@ -22,6 +22,11 @@ export async function createOrder(
         }
     );
 
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Server returned ${response.status}: ${errText}`);
+    }
+
     return response.json();
 }
 

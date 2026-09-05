@@ -1,37 +1,36 @@
 import { useState } from "react";
-
-import OrderForm
-    from "./components/OrderForm";
-
-import OrderStatus
-    from "./components/OrderStatus";
-
+import OrderForm from "./components/OrderForm";
+import OrderStatus from "./components/OrderStatus";
 
 function App() {
-
-    const [orderId, setOrderId] =
-        useState(null);
-
+    const [orderId, setOrderId] = useState(null);
+    const [currentOrder, setCurrentOrder] = useState(null);
 
     return (
-
         <div>
+            <header className="header">
+                <h1 className="header-title">
+                    <span>⚡</span> SwiftTrack Portal
+                </h1>
+                <p className="header-subtitle">
+                    Heterogeneous Logistics Orchestration Middleware (CMS SOAP/XML | ROS REST/JSON | WMS TCP/IP)
+                </p>
+            </header>
 
-            <h1>
-                SwiftTrack
-            </h1>
+            <main className="grid-container">
+                <OrderForm
+                    setOrderId={setOrderId}
+                    setCurrentOrder={setCurrentOrder}
+                />
 
-            <OrderForm
-                setOrderId={setOrderId}
-            />
-
-            <OrderStatus
-                orderId={orderId}
-            />
-
+                <OrderStatus
+                    orderId={orderId}
+                    currentOrder={currentOrder}
+                    setCurrentOrder={setCurrentOrder}
+                />
+            </main>
         </div>
     );
 }
-
 
 export default App;
